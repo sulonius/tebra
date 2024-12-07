@@ -1,10 +1,10 @@
 {
   "name": "konvertor",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "app.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node index.js",
+    "start": "node app.js",
     "postinstall": "chmod +x /opt/render/project/go/src/github.com/sulonius/tebra/squashfs-root/AppRun"
 {
   "dependencies": {

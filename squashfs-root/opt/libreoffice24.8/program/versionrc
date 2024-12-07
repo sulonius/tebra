@@ -1,0 +1,10 @@
+[Version]
+AllLanguages=en-US
+buildid=48a6bac9e7e268aeb4c3483fcf825c94556d9f92
+ExtensionUpdateURL=https://updateexte.libreoffice.org/ExtensionUpdateService/check.Update
+ReferenceOOoMajorMinor=4.1
+UpdateChannel=LOOnlineUpdater
+UpdateID=LibreOffice_24_en-US
+UpdateURL=https://update.libreoffice.org/check.php?pkgfmt=deb
+UpdateUserAgent=<PRODUCT> (${buildid}; ${_OS}; ${_ARCH}; <OPTIONAL_OS_HW_DATA>)
+Vendor=The Document Foundation

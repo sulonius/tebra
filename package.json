@@ -1,4 +1,12 @@
 {
+  "name": "konvertor",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node index.js",
+    "postinstall": "chmod +x /opt/render/project/go/src/github.com/sulonius/tebra/squashfs-root/AppRun"
+{
   "dependencies": {
     "archiver": "^7.0.1",
     "dotenv": "^16.4.7",
@@ -6,4 +14,5 @@
     "unzipper": "^0.12.3",
     "xmldom": "^0.6.0"
   }
+  "description": ""
 }

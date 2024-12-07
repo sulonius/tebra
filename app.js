@@ -119,15 +119,22 @@ app.post("/replace", async (req, res) => {
         await archive.finalize();
         console.log("Modified .docx file saved.");
 
-        // Step 4: Convert the modified .docx to PDF using extracted LibreOffice
+        // Step 4: Make sure AppRun is executable and convert to PDF using LibreOffice
+        const appRunPath = path.join(libreOfficeDir, "AppRun");
+
+        // Grant execute permissions
+        fs.chmodSync(appRunPath, "755"); // Make AppRun executable
+
         const pdfPath = path.resolve("./una_modified.pdf");
-        const libreOfficeCommand = `${libreOfficeDir}/AppRun --headless --convert-to pdf --outdir "${path.dirname(
-          pdfPath
-        )}" "${modifiedDocxPath}"`;
+        const libreOfficeCommand = `${appRunPath} --headless --convert-to pdf --outdir "${path.dirname(pdfPath)}" "${modifiedDocxPath}"`;
 
         exec(libreOfficeCommand, (error, stdout, stderr) => {
           if (error) {
-            console.error(`Error during LibreOffice export: ${error.message}`);
+            if (stderr.includes('Permission denied')) {
+              console.error("Permission denied: Ensure 'AppRun' is executable.");
+            } else {
+              console.error(`Error during LibreOffice export: ${error.message}`);
+            }
             return res.status(500).send("Error during PDF conversion.");
           }
 
@@ -152,4 +159,3 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
-

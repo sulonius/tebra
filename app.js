@@ -123,18 +123,24 @@ app.post("/replace", async (req, res) => {
         const appRunPath = path.join(libreOfficeDir, "AppRun");
 
         // Grant execute permissions
-        fs.chmodSync(appRunPath, "755"); // Make AppRun executable
+        const chmodCommand = `chmod +x ${appRunPath}`;
+        exec(chmodCommand, (error, stdout, stderr) => {
+          if (error) {
+            console.error(`Error changing permissions: ${error.message}`);
+            return res.status(500).send("Error changing permissions for AppRun.");
+          }
+          console.log("Permissions changed:", stdout);
+        });
 
         const pdfPath = path.resolve("./una_modified.pdf");
         const libreOfficeCommand = `${appRunPath} --headless --convert-to pdf --outdir "${path.dirname(pdfPath)}" "${modifiedDocxPath}"`;
 
         exec(libreOfficeCommand, (error, stdout, stderr) => {
+          console.log("Standard Output:", stdout);
+          console.error("Standard Error:", stderr);
+
           if (error) {
-            if (stderr.includes('Permission denied')) {
-              console.error("Permission denied: Ensure 'AppRun' is executable.");
-            } else {
-              console.error(`Error during LibreOffice export: ${error.message}`);
-            }
+            console.error(`Error during LibreOffice export: ${error.message}`);
             return res.status(500).send("Error during PDF conversion.");
           }
 

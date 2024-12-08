@@ -1,12 +1,12 @@
 {
+  "scripts": {
+    "postinstall": "set -e && chmod +x /opt/render/project/src/squashfs-root/AppRun && echo 'AppRun permissions updated.' && apt-get update && apt-get install -y libnss3 libatk-bridge2.0-0 libatk1.0-0 libcups2 libxss1 libgdk-pixbuf2.0-0 libnspr4 libgbm1 && echo 'Dependencies installed successfully.'"
+  },
   "dependencies": {
     "archiver": "^7.0.1",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "unzipper": "^0.12.3",
     "xmldom": "^0.6.0"
-  },
-  "scripts": {
-    "postinstall": "chmod +x /opt/render/project/src/squashfs-root/AppRun && apt-get update && apt-get install -y libnss3 libatk-bridge2.0-0 libatk1.0-0 libcups2 libxss1 libgdk-pixbuf2.0-0 libnspr4 libgbm1"
   }
 }

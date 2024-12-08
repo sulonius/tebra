@@ -2,7 +2,7 @@ require("dotenv").config();
 const express = require("express");
 const fs = require("fs");
 const path = require("path");
-const { execSync } = require("child_process");
+const { exec } = require("child_process");
 const { DOMParser, XMLSerializer } = require("xmldom");
 const unzipper = require("unzipper");
 const archiver = require("archiver");
@@ -19,14 +19,6 @@ const libreOfficeDir = path.resolve(process.env.LIBRE_OFFICE_DIR || "./squashfs-
 // Check if the necessary directories exist, if not create them
 if (!fs.existsSync(tempDir)) {
   fs.mkdirSync(tempDir, { recursive: true });
-}
-
-// Set executable permissions for AppRun
-try {
-  execSync(`chmod +x ${libreOfficeDir}/AppRun`);
-  console.log('Set executable permission for AppRun');
-} catch (error) {
-  console.error('Error setting executable permission:', error.message);
 }
 
 app.get("/", (req, res) => {
@@ -52,14 +44,6 @@ app.post("/replace", async (req, res) => {
       return res.status(400).send("All fields are required.");
     }
 
-    if (!fs.existsSync(filePath)) {
-      return res.status(400).send("Original DOCX file does not exist.");
-    }
-
-    if (!fs.existsSync(libreOfficeDir)) {
-      return res.status(400).send("LibreOffice directory does not exist.");
-    }
-
     // Step 1: Extract the .docx file
     fs.createReadStream(filePath)
       .pipe(unzipper.Extract({ path: tempDir }))
@@ -67,7 +51,69 @@ app.post("/replace", async (req, res) => {
         console.log("Extraction complete.");
 
         // Step 2: Modify headers and body content
-        // ... (Tvoj kod za modifikaciju dokumenta)
+        const headerFiles = fs
+          .readdirSync(`${tempDir}/word`)
+          .filter((file) => file.startsWith("header") && file.endsWith(".xml"));
+
+        headerFiles.forEach((headerFile) => {
+          const headerPath = `${tempDir}/word/${headerFile}`;
+          let headerXML = fs.readFileSync(headerPath, "utf-8");
+
+          const xmlDoc = new DOMParser().parseFromString(headerXML, "text/xml");
+          const textNodes = xmlDoc.getElementsByTagName("w:t");
+
+          Array.from(textNodes).forEach((node) => {
+            if (node.textContent.includes("email")) {
+              node.textContent = node.textContent.replace("email", replacementEmail);
+            }
+            if (node.textContent.includes("datum")) {
+              node.textContent = node.textContent.replace("datum", replacementDatum);
+            }
+            if (node.textContent.includes("una")) {
+              node.textContent = node.textContent.replace("una", replacementUna);
+            }
+          });
+
+          const updatedXML = new XMLSerializer().serializeToString(xmlDoc);
+          fs.writeFileSync(headerPath, updatedXML, "utf-8");
+          console.log(`Updated ${headerFile}`);
+        });
+
+        const bodyFiles = fs
+          .readdirSync(`${tempDir}/word`)
+          .filter((file) => file.endsWith(".xml") && !file.startsWith("header") && !file.startsWith("footer"));
+
+        bodyFiles.forEach((bodyFile) => {
+          const bodyPath = `${tempDir}/word/${bodyFile}`;
+          let bodyXML = fs.readFileSync(bodyPath, "utf-8");
+
+          const xmlDoc = new DOMParser().parseFromString(bodyXML, "text/xml");
+          const textNodes = xmlDoc.getElementsByTagName("w:t");
+
+          Array.from(textNodes).forEach((node) => {
+            if (node.textContent.includes("una")) {
+              const parent = node.parentNode;
+
+              while (parent.firstChild) parent.removeChild(parent.firstChild);
+
+              const lines = replacementUna.split(/\r?\n/);
+              lines.forEach((line, index) => {
+                const textNode = xmlDoc.createElement("w:t");
+                textNode.textContent = line;
+                parent.appendChild(textNode);
+
+                if (index < lines.length - 1) {
+                  const lineBreak = xmlDoc.createElement("w:br");
+                  parent.appendChild(lineBreak);
+                }
+              });
+            }
+          });
+
+          const updatedXML = new XMLSerializer().serializeToString(xmlDoc);
+          fs.writeFileSync(bodyPath, updatedXML, "utf-8");
+          console.log(`Updated body content in ${bodyFile}`);
+        });
 
         // Step 3: Repack the modified Word document
         const modifiedDocxPath = path.resolve("./una_modified.docx");
@@ -75,29 +121,40 @@ app.post("/replace", async (req, res) => {
         const archive = archiver("zip", { zlib: { level: 9 } });
 
         archive.pipe(output);
+        archive.directory(tempDir, false);
         await archive.finalize();
         console.log("Modified .docx file saved.");
 
-        // Step 4: Convert the modified .docx to PDF using extracted LibreOffice
-        const pdfPath = path.resolve("./una_modified.pdf");
+        // Step 4: Assign execution permission for AppRun and convert to PDF
         const libreOfficeCommand = `${libreOfficeDir}/AppRun --headless --convert-to pdf --outdir "${path.dirname(
-          pdfPath
+          modifiedDocxPath
         )}" "${modifiedDocxPath}"`;
 
-        try {
-          const output = execSync(libreOfficeCommand);
-          console.log("PDF generated successfully:", output.toString());
-        } catch (error) {
-          console.error(`Error during LibreOffice export: ${error.message}`);
-          return res.status(500).send("Error during PDF conversion.");
-        }
+        // Ensure AppRun has execute permissions
+        exec(`chmod +x ${libreOfficeDir}/AppRun`, (error, stdout, stderr) => {
+          if (error) {
+            console.error(`Error assigning permission: ${error.message}`);
+            return res.status(500).send("Error assigning permission to AppRun.");
+          }
+          console.log("Permission assigned successfully.");
 
-        // Clean up temporary files
-        fs.rmSync(tempDir, { recursive: true, force: true });
+          // Execute the LibreOffice command
+          exec(libreOfficeCommand, (error, stdout, stderr) => {
+            if (error) {
+              console.error(`Error during LibreOffice export: ${error.message}`);
+              return res.status(500).send("Error during PDF conversion.");
+            }
 
-        // Send the PDF as a download
-        res.download(pdfPath, "modified.pdf", (err) => {
-          if (err) console.error("Error sending PDF:", err);
+            console.log("PDF generated successfully:", stdout);
+
+            // Clean up temporary files
+            fs.rmSync(tempDir, { recursive: true, force: true });
+
+            // Send the PDF as a download
+            res.download(path.resolve("./una_modified.pdf"), "modified.pdf", (err) => {
+              if (err) console.error("Error sending PDF:", err);
+            });
+          });
         });
       });
   } catch (err) {

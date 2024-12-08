@@ -122,16 +122,16 @@ app.post("/replace", async (req, res) => {
         // Step 4: Make sure AppRun is executable and convert to PDF using LibreOffice
         const appRunPath = path.join(libreOfficeDir, "AppRun");
 
-        // Grant execute permissions for AppRun
+        // Grant execute permissions
         const chmodCommand = `chmod +x ${appRunPath}`;
         exec(chmodCommand, (error, stdout, stderr) => {
           if (error) {
             console.error(`Error changing permissions: ${error.message}`);
             return res.status(500).send("Error changing permissions for AppRun.");
           }
-          console.log("Permissions for AppRun changed successfully.");
+          console.log("Permissions changed:", stdout);
 
-          // Now, proceed with the conversion to PDF
+          // Step 5: Convert DOCX to PDF using LibreOffice
           const pdfPath = path.resolve("./una_modified.pdf");
           const libreOfficeCommand = `${appRunPath} --headless --convert-to pdf --outdir "${path.dirname(pdfPath)}" "${modifiedDocxPath}"`;
 

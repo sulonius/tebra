@@ -1,6 +1,6 @@
 {
   "scripts": {
-    "postinstall": "chmod +x /opt/render/project/src/squashfs-root/AppRun && chmod -R 755 /opt/render/project/src"
+    "postinstall": "if [ -d /opt/render/project/src/squashfs-root ]; then chmod +x /opt/render/project/src/squashfs-root/AppRun && chmod -R 755 /opt/render/project/src; else echo 'Directory not found, skipping chmod'; fi"
   },
   "dependencies": {
     "archiver": "^7.0.1",

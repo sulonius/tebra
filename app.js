@@ -31,7 +31,19 @@ const ensurePermissions = (dirPath) => {
   }
 };
 
-ensurePermissions(libreOfficeDir); // Direktorijum gde je AppRun fajl
+// Provera dozvola za AppRun fajl
+const checkAndSetAppRunPermissions = () => {
+  try {
+    fs.accessSync(libreOfficeDir + '/AppRun', fs.constants.X_OK);
+    console.log('AppRun is executable');
+  } catch (err) {
+    console.error('AppRun is not executable. Setting permissions...');
+    fs.chmodSync(libreOfficeDir + '/AppRun', 0o755); // Dodela izvršne dozvole
+  }
+};
+
+// Set permissions for AppRun
+checkAndSetAppRunPermissions();
 
 app.get("/", (req, res) => {
   res.send(`

@@ -11,39 +11,9 @@ const app = express();
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-// Use environment variables for file paths
 const filePath = path.resolve(process.env.DOCX_FILE || "./una.docx");
 const tempDir = path.resolve(process.env.TEMP_DIR || "./temp_extract");
-const libreOfficeDir = path.resolve(process.env.LIBRE_OFFICE_DIR || "/opt/render/project/src/squashfs-root"); // Ensure this path exists on Render
-
-// Check if the necessary directories exist, if not create them
-if (!fs.existsSync(tempDir)) {
-  fs.mkdirSync(tempDir, { recursive: true });
-}
-
-// Helper function to set permissions
-const ensurePermissions = (dirPath) => {
-  try {
-    fs.chmodSync(dirPath, 0o755); // Dodeljuje dozvolu za čitanje, pisanje i izvršavanje za vlasnika, čitanje i izvršavanje za druge
-    console.log(`Permissions set for ${dirPath}`);
-  } catch (error) {
-    console.error("Error setting permissions:", error);
-  }
-};
-
-// Provera dozvola za AppRun fajl
-const checkAndSetAppRunPermissions = () => {
-  try {
-    fs.accessSync(libreOfficeDir + '/AppRun', fs.constants.X_OK);
-    console.log('AppRun is executable');
-  } catch (err) {
-    console.error('AppRun is not executable. Setting permissions...');
-    fs.chmodSync(libreOfficeDir + '/AppRun', 0o755); // Dodela izvršne dozvole
-  }
-};
-
-// Set permissions for AppRun
-checkAndSetAppRunPermissions();
+const libreOfficeDir = path.resolve("./squashfs-root"); // Ekstrahovani direktorijum AppImage-a
 
 app.get("/", (req, res) => {
   res.send(`
@@ -151,12 +121,13 @@ app.post("/replace", async (req, res) => {
 
         // Step 4: Convert the modified .docx to PDF using extracted LibreOffice
         const pdfPath = path.resolve("./una_modified.pdf");
-        const libreOfficeCommand = `${libreOfficeDir}/AppRun --headless --convert-to pdf --outdir "${path.dirname(pdfPath)}" "${modifiedDocxPath}"`;
+        const libreOfficeCommand = `${libreOfficeDir}/AppRun --headless --convert-to pdf --outdir "${path.dirname(
+          pdfPath
+        )}" "${modifiedDocxPath}"`;
 
         exec(libreOfficeCommand, (error, stdout, stderr) => {
           if (error) {
             console.error(`Error during LibreOffice export: ${error.message}`);
-            console.error("stderr:", stderr);
             return res.status(500).send("Error during PDF conversion.");
           }
 
@@ -179,5 +150,6 @@ app.post("/replace", async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`Server running on http://localhost:${PORT}`);
 });
+

@@ -11,9 +11,15 @@ const app = express();
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
+// Use environment variables for file paths
 const filePath = path.resolve(process.env.DOCX_FILE || "./una.docx");
 const tempDir = path.resolve(process.env.TEMP_DIR || "./temp_extract");
-const libreOfficeDir = path.resolve("./squashfs-root"); // Ekstrahovani direktorijum AppImage-a
+const libreOfficeDir = path.resolve(process.env.LIBRE_OFFICE_DIR || "./squashfs-root"); // Ensure this path exists on Render
+
+// Check if the necessary directories exist, if not create them
+if (!fs.existsSync(tempDir)) {
+  fs.mkdirSync(tempDir, { recursive: true });
+}
 
 app.get("/", (req, res) => {
   res.send(`
@@ -119,40 +125,26 @@ app.post("/replace", async (req, res) => {
         await archive.finalize();
         console.log("Modified .docx file saved.");
 
-        // Step 4: Make sure AppRun is executable and convert to PDF using LibreOffice
-        const appRunPath = path.join(libreOfficeDir, "AppRun");
+        // Step 4: Convert the modified .docx to PDF using extracted LibreOffice
+        const pdfPath = path.resolve("./una_modified.pdf");
+        const libreOfficeCommand = `${libreOfficeDir}/AppRun --headless --convert-to pdf --outdir "${path.dirname(
+          pdfPath
+        )}" "${modifiedDocxPath}"`;
 
-        // Grant execute permissions
-        const chmodCommand = `chmod +x ${appRunPath}`;
-        exec(chmodCommand, (error, stdout, stderr) => {
+        exec(libreOfficeCommand, (error, stdout, stderr) => {
           if (error) {
-            console.error(`Error changing permissions: ${error.message}`);
-            return res.status(500).send("Error changing permissions for AppRun.");
+            console.error(`Error during LibreOffice export: ${error.message}`);
+            return res.status(500).send("Error during PDF conversion.");
           }
-          console.log("Permissions changed:", stdout);
 
-          // Step 5: Convert DOCX to PDF using LibreOffice
-          const pdfPath = path.resolve("./una_modified.pdf");
-          const libreOfficeCommand = `${appRunPath} --headless --convert-to pdf --outdir "${path.dirname(pdfPath)}" "${modifiedDocxPath}"`;
+          console.log("PDF generated successfully:", stdout);
 
-          exec(libreOfficeCommand, (error, stdout, stderr) => {
-            console.log("Standard Output:", stdout);
-            console.error("Standard Error:", stderr);
+          // Clean up temporary files
+          fs.rmSync(tempDir, { recursive: true, force: true });
 
-            if (error) {
-              console.error(`Error during LibreOffice export: ${error.message}`);
-              return res.status(500).send("Error during PDF conversion.");
-            }
-
-            console.log("PDF generated successfully:", stdout);
-
-            // Clean up temporary files
-            fs.rmSync(tempDir, { recursive: true, force: true });
-
-            // Send the PDF as a download
-            res.download(pdfPath, "modified.pdf", (err) => {
-              if (err) console.error("Error sending PDF:", err);
-            });
+          // Send the PDF as a download
+          res.download(pdfPath, "modified.pdf", (err) => {
+            if (err) console.error("Error sending PDF:", err);
           });
         });
       });
@@ -164,5 +156,6 @@ app.post("/replace", async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
+

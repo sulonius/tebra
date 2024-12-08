@@ -122,36 +122,37 @@ app.post("/replace", async (req, res) => {
         // Step 4: Make sure AppRun is executable and convert to PDF using LibreOffice
         const appRunPath = path.join(libreOfficeDir, "AppRun");
 
-        // Grant execute permissions
+        // Grant execute permissions for AppRun
         const chmodCommand = `chmod +x ${appRunPath}`;
         exec(chmodCommand, (error, stdout, stderr) => {
           if (error) {
             console.error(`Error changing permissions: ${error.message}`);
             return res.status(500).send("Error changing permissions for AppRun.");
           }
-          console.log("Permissions changed:", stdout);
-        });
+          console.log("Permissions for AppRun changed successfully.");
 
-        const pdfPath = path.resolve("./una_modified.pdf");
-        const libreOfficeCommand = `${appRunPath} --headless --convert-to pdf --outdir "${path.dirname(pdfPath)}" "${modifiedDocxPath}"`;
+          // Now, proceed with the conversion to PDF
+          const pdfPath = path.resolve("./una_modified.pdf");
+          const libreOfficeCommand = `${appRunPath} --headless --convert-to pdf --outdir "${path.dirname(pdfPath)}" "${modifiedDocxPath}"`;
 
-        exec(libreOfficeCommand, (error, stdout, stderr) => {
-          console.log("Standard Output:", stdout);
-          console.error("Standard Error:", stderr);
+          exec(libreOfficeCommand, (error, stdout, stderr) => {
+            console.log("Standard Output:", stdout);
+            console.error("Standard Error:", stderr);
 
-          if (error) {
-            console.error(`Error during LibreOffice export: ${error.message}`);
-            return res.status(500).send("Error during PDF conversion.");
-          }
+            if (error) {
+              console.error(`Error during LibreOffice export: ${error.message}`);
+              return res.status(500).send("Error during PDF conversion.");
+            }
 
-          console.log("PDF generated successfully:", stdout);
+            console.log("PDF generated successfully:", stdout);
 
-          // Clean up temporary files
-          fs.rmSync(tempDir, { recursive: true, force: true });
+            // Clean up temporary files
+            fs.rmSync(tempDir, { recursive: true, force: true });
 
-          // Send the PDF as a download
-          res.download(pdfPath, "modified.pdf", (err) => {
-            if (err) console.error("Error sending PDF:", err);
+            // Send the PDF as a download
+            res.download(pdfPath, "modified.pdf", (err) => {
+              if (err) console.error("Error sending PDF:", err);
+            });
           });
         });
       });

@@ -1,6 +1,6 @@
 {
   "scripts": {
-    "postinstall": "set -e && chmod +x /opt/render/project/src/squashfs-root/AppRun && ls -l /opt/render/project/src/squashfs-root/AppRun && echo 'AppRun permissions updated.' && apt-get update && apt-get install -y libnss3 libatk-bridge2.0-0 libatk1.0-0 libcups2 libxss1 libgdk-pixbuf2.0-0 libnspr4 libgbm1 libgl1-mesa-glx libfontconfig1 && echo 'Dependencies installed successfully.'"
+    "postinstall": "set -e && apt-get update && apt-get install -y libnss3 libatk-bridge2.0-0 libatk1.0-0 libcups2 libxss1 libgdk-pixbuf2.0-0 libnspr4 libgbm1 libgl1-mesa-glx libfontconfig1 && chmod +x /opt/render/project/src/squashfs-root/AppRun && cp /opt/render/project/src/squashfs-root/AppRun /opt/render/project/src/squashfs-root/AppRun_new && chmod +x /opt/render/project/src/squashfs-root/AppRun_new && echo 'Permissions for AppRun_new updated.'"
   },
   "dependencies": {
     "archiver": "^7.0.1",

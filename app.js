@@ -14,12 +14,24 @@ app.use(express.json());
 // Use environment variables for file paths
 const filePath = path.resolve(process.env.DOCX_FILE || "./una.docx");
 const tempDir = path.resolve(process.env.TEMP_DIR || "./temp_extract");
-const libreOfficeDir = path.resolve(process.env.LIBRE_OFFICE_DIR || "./squashfs-root"); // Ensure this path exists on Render
+const libreOfficeDir = path.resolve(process.env.LIBRE_OFFICE_DIR || "/opt/render/project/src/squashfs-root"); // Ensure this path exists on Render
 
 // Check if the necessary directories exist, if not create them
 if (!fs.existsSync(tempDir)) {
   fs.mkdirSync(tempDir, { recursive: true });
 }
+
+// Helper function to set permissions
+const ensurePermissions = (dirPath) => {
+  try {
+    fs.chmodSync(dirPath, 0o755); // Dodeljuje dozvolu za čitanje, pisanje i izvršavanje za vlasnika, čitanje i izvršavanje za druge
+    console.log(`Permissions set for ${dirPath}`);
+  } catch (error) {
+    console.error("Error setting permissions:", error);
+  }
+};
+
+ensurePermissions(libreOfficeDir); // Direktorijum gde je AppRun fajl
 
 app.get("/", (req, res) => {
   res.send(`
@@ -125,35 +137,25 @@ app.post("/replace", async (req, res) => {
         await archive.finalize();
         console.log("Modified .docx file saved.");
 
-        // Step 4: Assign execution permission for AppRun and convert to PDF
-        const libreOfficeCommand = `${libreOfficeDir}/AppRun --headless --convert-to pdf --outdir "${path.dirname(
-          modifiedDocxPath
-        )}" "${modifiedDocxPath}"`;
+        // Step 4: Convert the modified .docx to PDF using extracted LibreOffice
+        const pdfPath = path.resolve("./una_modified.pdf");
+        const libreOfficeCommand = `${libreOfficeDir}/AppRun --headless --convert-to pdf --outdir "${path.dirname(pdfPath)}" "${modifiedDocxPath}"`;
 
-        // Ensure AppRun has execute permissions
-        exec(`chmod +x ${libreOfficeDir}/AppRun`, (error, stdout, stderr) => {
+        exec(libreOfficeCommand, (error, stdout, stderr) => {
           if (error) {
-            console.error(`Error assigning permission: ${error.message}`);
-            return res.status(500).send("Error assigning permission to AppRun.");
+            console.error(`Error during LibreOffice export: ${error.message}`);
+            console.error("stderr:", stderr);
+            return res.status(500).send("Error during PDF conversion.");
           }
-          console.log("Permission assigned successfully.");
 
-          // Execute the LibreOffice command
-          exec(libreOfficeCommand, (error, stdout, stderr) => {
-            if (error) {
-              console.error(`Error during LibreOffice export: ${error.message}`);
-              return res.status(500).send("Error during PDF conversion.");
-            }
+          console.log("PDF generated successfully:", stdout);
 
-            console.log("PDF generated successfully:", stdout);
+          // Clean up temporary files
+          fs.rmSync(tempDir, { recursive: true, force: true });
 
-            // Clean up temporary files
-            fs.rmSync(tempDir, { recursive: true, force: true });
-
-            // Send the PDF as a download
-            res.download(path.resolve("./una_modified.pdf"), "modified.pdf", (err) => {
-              if (err) console.error("Error sending PDF:", err);
-            });
+          // Send the PDF as a download
+          res.download(pdfPath, "modified.pdf", (err) => {
+            if (err) console.error("Error sending PDF:", err);
           });
         });
       });

@@ -11,11 +11,12 @@ const app = express();
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
+// Putanje do fajlova i direktorijuma
 const filePath = path.resolve(process.env.DOCX_FILE || "./una.docx");
-const tempDir = path.resolve(process.env.TEMP_DIR || "/tmp/temp_extract"); // Temporary directory
-const libreOfficeDir = path.resolve(process.env.LIBRE_OFFICE_DIR || "./squashfs-root"); // LibreOffice location
+const tempDir = path.resolve(process.env.TEMP_DIR || "/tmp/temp_extract");
+const libreOfficeDir = path.resolve(process.env.LIBRE_OFFICE_DIR || "./squashfs-root");
 
-// Function to check if AppRun has execute permissions
+// Funkcija za proveru i postavljanje dozvola
 const checkAppRunPermissions = () => {
   const appRunPath = path.resolve(libreOfficeDir, "AppRun");
 
@@ -24,14 +25,15 @@ const checkAppRunPermissions = () => {
   }
 
   try {
-    fs.accessSync(appRunPath, fs.constants.X_OK);
+    fs.accessSync(appRunPath, fs.constants.X_OK); // Provera dozvola
   } catch {
-    console.error("AppRun file is not executable. Fixing permissions...");
-    fs.chmodSync(appRunPath, "755"); // Automatically fix permissions
+    console.log("Fixing permissions for AppRun...");
+    fs.chmodSync(appRunPath, 0o755); // Postavljanje dozvola
+    console.log("Permissions set for AppRun.");
   }
 };
 
-// Home route with form
+// Početna ruta sa formom
 app.get("/", (req, res) => {
   res.send(`
     <h1>Word Header Text Replacement</h1>
@@ -47,7 +49,7 @@ app.get("/", (req, res) => {
   `);
 });
 
-// Replace route
+// Ruta za zamenu teksta
 app.post("/replace", async (req, res) => {
   const { replacementEmail, replacementDatum, replacementUna } = req.body;
 
@@ -56,13 +58,13 @@ app.post("/replace", async (req, res) => {
       return res.status(400).send("All fields are required.");
     }
 
-    // Step 1: Extract the .docx file
+    // Korak 1: Ekstrakcija .docx fajla
     fs.createReadStream(filePath)
       .pipe(unzipper.Extract({ path: tempDir }))
       .on("close", async () => {
         console.log("Extraction complete.");
 
-        // Step 2: Modify headers and body content
+        // Korak 2: Modifikacija zaglavlja i sadržaja
         const headerFiles = fs
           .readdirSync(`${tempDir}/word`)
           .filter((file) => file.startsWith("header") && file.endsWith(".xml"));
@@ -91,7 +93,7 @@ app.post("/replace", async (req, res) => {
           console.log(`Updated ${headerFile}`);
         });
 
-        // Body modification
+        // Telo dokumenta
         const bodyFiles = fs
           .readdirSync(`${tempDir}/word`)
           .filter((file) => file.endsWith(".xml") && !file.startsWith("header") && !file.startsWith("footer"));
@@ -128,7 +130,7 @@ app.post("/replace", async (req, res) => {
           console.log(`Updated body content in ${bodyFile}`);
         });
 
-        // Step 3: Repack the modified Word document
+        // Korak 3: Repacking
         const modifiedDocxPath = path.resolve("/tmp/una_modified.docx");
         const output = fs.createWriteStream(modifiedDocxPath);
         const archive = archiver("zip", { zlib: { level: 9 } });
@@ -138,24 +140,26 @@ app.post("/replace", async (req, res) => {
         await archive.finalize();
         console.log("Modified .docx file saved.");
 
-        // Step 4: Convert the modified .docx to PDF
-        checkAppRunPermissions(); // Validate AppRun permissions
+        // Korak 4: Konverzija u PDF
+        checkAppRunPermissions(); // Validacija dozvola
 
         const pdfPath = path.resolve("/tmp/una_modified.pdf");
-        const libreOfficeCommand = `${path.resolve(libreOfficeDir, "AppRun")} --headless --convert-to pdf --outdir "${path.dirname(pdfPath)}" "${modifiedDocxPath}"`;
+        const libreOfficeCommand = `libreoffice --headless --convert-to pdf --outdir "${path.dirname(pdfPath)}" "${modifiedDocxPath}"`;
 
         exec(libreOfficeCommand, (error, stdout, stderr) => {
           if (error) {
-            console.error(`Error during LibreOffice export: ${error.message}`);
+            console.error("Error during LibreOffice export:", error.message);
+            console.error("STDOUT:", stdout);
+            console.error("STDERR:", stderr);
             return res.status(500).send("Error during PDF conversion.");
           }
 
           console.log("PDF generated successfully:", stdout);
 
-          // Clean up temporary files
+          // Brisanje privremenih fajlova
           fs.rmSync(tempDir, { recursive: true, force: true });
 
-          // Send the PDF as a download
+          // Slanje PDF-a kao download
           res.download(pdfPath, "modified.pdf", (err) => {
             if (err) console.error("Error sending PDF:", err);
           });

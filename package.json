@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node app.js",
     "fix-permissions": "chmod +x ./squashfs-root/AppRun && echo 'Permissions fixed for AppRun.'",
-    "prepare": "npm run fix-permissions && echo 'Project prepared for execution.'"
+    "prepare": "npm run fix-permissions && echo 'Project prepared for execution.'",
+    "postinstall": "npm run fix-permissions && echo 'Permissions fixed for AppRun after installation.'"
   },
   "dependencies": {
     "archiver": "^7.0.1",
@@ -16,3 +17,4 @@
     "xmldom": "^0.6.0"
   }
 }
+

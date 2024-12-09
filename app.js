@@ -12,9 +12,25 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
 const filePath = path.resolve(process.env.DOCX_FILE || "./una.docx");
-const tempDir = path.resolve(process.env.TEMP_DIR || "/tmp/temp_extract");  // Use /tmp for Render
-const libreOfficeDir = path.resolve(process.env.LIBRE_OFFICE_DIR || "./squashfs-root"); // Adjusted for squashfs-root
+const tempDir = path.resolve(process.env.TEMP_DIR || "/tmp/temp_extract"); // Temporary directory
+const libreOfficeDir = path.resolve(process.env.LIBRE_OFFICE_DIR || "./squashfs-root"); // LibreOffice location
 
+// Function to check if AppRun has execute permissions
+const checkAppRunPermissions = () => {
+  const appRunPath = path.resolve(libreOfficeDir, "AppRun");
+
+  if (!fs.existsSync(appRunPath)) {
+    throw new Error("AppRun file does not exist in the specified LibreOffice directory.");
+  }
+
+  try {
+    fs.accessSync(appRunPath, fs.constants.X_OK);
+  } catch {
+    throw new Error("AppRun file is not executable. Run 'chmod +x ./squashfs-root/AppRun' to fix this issue.");
+  }
+};
+
+// Home route with form
 app.get("/", (req, res) => {
   res.send(`
     <h1>Word Header Text Replacement</h1>
@@ -30,6 +46,7 @@ app.get("/", (req, res) => {
   `);
 });
 
+// Replace route
 app.post("/replace", async (req, res) => {
   const { replacementEmail, replacementDatum, replacementUna } = req.body;
 
@@ -73,6 +90,7 @@ app.post("/replace", async (req, res) => {
           console.log(`Updated ${headerFile}`);
         });
 
+        // Body modification
         const bodyFiles = fs
           .readdirSync(`${tempDir}/word`)
           .filter((file) => file.endsWith(".xml") && !file.startsWith("header") && !file.startsWith("footer"));
@@ -110,7 +128,7 @@ app.post("/replace", async (req, res) => {
         });
 
         // Step 3: Repack the modified Word document
-        const modifiedDocxPath = path.resolve("/tmp/una_modified.docx"); // Store in /tmp
+        const modifiedDocxPath = path.resolve("/tmp/una_modified.docx");
         const output = fs.createWriteStream(modifiedDocxPath);
         const archive = archiver("zip", { zlib: { level: 9 } });
 
@@ -119,8 +137,10 @@ app.post("/replace", async (req, res) => {
         await archive.finalize();
         console.log("Modified .docx file saved.");
 
-        // Step 4: Convert the modified .docx to PDF using extracted LibreOffice
-        const pdfPath = path.resolve("/tmp/una_modified.pdf"); // Store in /tmp
+        // Step 4: Convert the modified .docx to PDF
+        checkAppRunPermissions(); // Validate AppRun permissions
+
+        const pdfPath = path.resolve("/tmp/una_modified.pdf");
         const libreOfficeCommand = `${path.resolve(libreOfficeDir, "AppRun")} --headless --convert-to pdf --outdir "${path.dirname(pdfPath)}" "${modifiedDocxPath}"`;
 
         exec(libreOfficeCommand, (error, stdout, stderr) => {

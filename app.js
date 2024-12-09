@@ -26,7 +26,8 @@ const checkAppRunPermissions = () => {
   try {
     fs.accessSync(appRunPath, fs.constants.X_OK);
   } catch {
-    throw new Error("AppRun file is not executable. Run 'chmod +x ./squashfs-root/AppRun' to fix this issue.");
+    console.error("AppRun file is not executable. Fixing permissions...");
+    fs.chmodSync(appRunPath, "755"); // Automatically fix permissions
   }
 };
 

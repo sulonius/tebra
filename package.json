@@ -1,11 +1,4 @@
 {
-  "name": "docx-to-pdf-converter",
-  "version": "1.0.0",
-  "description": "Server for modifying .docx files and converting them to PDF.",
-  "main": "app.js",
-  "scripts": {
-    "start": "node app.js"
-  },
   "dependencies": {
     "archiver": "^7.0.1",
     "dotenv": "^16.4.7",

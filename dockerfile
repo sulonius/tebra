@@ -1,16 +1,21 @@
 FROM node:16
 
-# Install LibreOffice
+# Instalirajte LibreOffice
 RUN apt-get update && apt-get install -y libreoffice
 
-# Install dependencies
+# Postavite radni direktorijum
 WORKDIR /app
-COPY package.json .
+
+# Kopirajte package.json i instalirajte zavisnosti
+COPY package.json package-lock.json ./
 RUN npm install
+
+# Kopirajte ostatak vaših fajlova
 COPY . .
 
-# Expose port
+# Izložite port na kojem će Render povezati vašu aplikaciju
 EXPOSE 3000
 
+# Pokrenite aplikaciju
 CMD ["npm", "start"]
 

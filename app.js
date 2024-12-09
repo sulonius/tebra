@@ -1,3 +1,4 @@
+require("dotenv").config();
 const express = require("express");
 const fs = require("fs");
 const path = require("path");
@@ -10,27 +11,9 @@ const app = express();
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-// Putanje do fajlova
-const squashfsRoot = path.resolve(__dirname, "squashfs-root");
-const libreOfficeAppRun = path.join(squashfsRoot, "AppRun");
-const tempDir = path.resolve("/tmp/temp_extract");
-const inputFilePath = path.resolve(__dirname, "una.docx");
+const filePath = path.resolve(process.env.DOCX_FILE || "./una.docx");
+const tempDir = path.resolve(process.env.TEMP_DIR || "./temp_extract");
 
-// Proveri dozvole za AppRun
-const checkAppRunPermissions = () => {
-  if (!fs.existsSync(libreOfficeAppRun)) {
-    throw new Error("AppRun not found in squashfs-root directory.");
-  }
-
-  try {
-    fs.accessSync(libreOfficeAppRun, fs.constants.X_OK);
-  } catch {
-    fs.chmodSync(libreOfficeAppRun, 0o755); // Postavi izvršne dozvole
-    console.log("Permissions for AppRun fixed.");
-  }
-};
-
-// Početna stranica sa formom
 app.get("/", (req, res) => {
   res.send(`
     <h1>Word Header Text Replacement</h1>
@@ -46,7 +29,6 @@ app.get("/", (req, res) => {
   `);
 });
 
-// Ruta za zamenu teksta
 app.post("/replace", async (req, res) => {
   const { replacementEmail, replacementDatum, replacementUna } = req.body;
 
@@ -55,13 +37,13 @@ app.post("/replace", async (req, res) => {
       return res.status(400).send("All fields are required.");
     }
 
-    // Ekstrakcija DOCX fajla
-    fs.createReadStream(inputFilePath)
+    // Step 1: Extract the .docx file
+    fs.createReadStream(filePath)
       .pipe(unzipper.Extract({ path: tempDir }))
       .on("close", async () => {
         console.log("Extraction complete.");
 
-        // Zameni tekst u header fajlovima
+        // Step 2: Modify headers and body content
         const headerFiles = fs
           .readdirSync(`${tempDir}/word`)
           .filter((file) => file.startsWith("header") && file.endsWith(".xml"));
@@ -87,29 +69,73 @@ app.post("/replace", async (req, res) => {
 
           const updatedXML = new XMLSerializer().serializeToString(xmlDoc);
           fs.writeFileSync(headerPath, updatedXML, "utf-8");
+          console.log(`Updated ${headerFile}`);
         });
 
-        // Repack DOCX
-        const modifiedDocxPath = path.resolve("/tmp/una_modified.docx");
+        const bodyFiles = fs
+          .readdirSync(`${tempDir}/word`)
+          .filter((file) => file.endsWith(".xml") && !file.startsWith("header") && !file.startsWith("footer"));
+
+        bodyFiles.forEach((bodyFile) => {
+          const bodyPath = `${tempDir}/word/${bodyFile}`;
+          let bodyXML = fs.readFileSync(bodyPath, "utf-8");
+
+          const xmlDoc = new DOMParser().parseFromString(bodyXML, "text/xml");
+          const textNodes = xmlDoc.getElementsByTagName("w:t");
+
+          Array.from(textNodes).forEach((node) => {
+            if (node.textContent.includes("una")) {
+              const parent = node.parentNode;
+
+              while (parent.firstChild) parent.removeChild(parent.firstChild);
+
+              const lines = replacementUna.split(/\r?\n/);
+              lines.forEach((line, index) => {
+                const textNode = xmlDoc.createElement("w:t");
+                textNode.textContent = line;
+                parent.appendChild(textNode);
+
+                if (index < lines.length - 1) {
+                  const lineBreak = xmlDoc.createElement("w:br");
+                  parent.appendChild(lineBreak);
+                }
+              });
+            }
+          });
+
+          const updatedXML = new XMLSerializer().serializeToString(xmlDoc);
+          fs.writeFileSync(bodyPath, updatedXML, "utf-8");
+          console.log(`Updated body content in ${bodyFile}`);
+        });
+
+        // Step 3: Repack the modified Word document
+        const modifiedDocxPath = path.resolve("./una_modified.docx");
         const output = fs.createWriteStream(modifiedDocxPath);
         const archive = archiver("zip", { zlib: { level: 9 } });
 
         archive.pipe(output);
         archive.directory(tempDir, false);
         await archive.finalize();
+        console.log("Modified .docx file saved.");
 
-        // Konverzija u PDF pomoću AppRun
-        checkAppRunPermissions();
-        const pdfPath = path.resolve("/tmp/una_modified.pdf");
-        const libreOfficeCommand = `"${libreOfficeAppRun}" --headless --convert-to pdf --outdir "/tmp" "${modifiedDocxPath}"`;
+        // Step 4: Convert the modified .docx to PDF using LibreOffice
+        const pdfPath = path.resolve("./una_modified.pdf");
+        const libreOfficeCommand = `libreoffice --headless --convert-to pdf --outdir "${path.dirname(
+          pdfPath
+        )}" "${modifiedDocxPath}"`;
 
         exec(libreOfficeCommand, (error, stdout, stderr) => {
           if (error) {
-            console.error("Error during PDF conversion:", error.message);
+            console.error(`Error during LibreOffice export: ${error.message}`);
             return res.status(500).send("Error during PDF conversion.");
           }
 
-          // Slanje PDF fajla
+          console.log("PDF generated successfully:", stdout);
+
+          // Clean up temporary files
+          fs.rmSync(tempDir, { recursive: true, force: true });
+
+          // Send the PDF as a download
           res.download(pdfPath, "modified.pdf", (err) => {
             if (err) console.error("Error sending PDF:", err);
           });
@@ -117,7 +143,7 @@ app.post("/replace", async (req, res) => {
       });
   } catch (err) {
     console.error("Error:", err);
-    res.status(500).send("An error occurred.");
+    res.status(500).send("An error occurred while processing the document.");
   }
 });
 

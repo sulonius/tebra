@@ -1,13 +1,10 @@
 {
-  "name": "docx-pdf-converter",
+  "name": "libreoffice-docx-converter",
   "version": "1.0.0",
-  "description": "A tool to modify DOCX files and convert them to PDF",
   "main": "app.js",
   "scripts": {
     "start": "node app.js",
-    "fix-permissions": "chmod +x ./squashfs-root/AppRun && echo 'Permissions fixed for AppRun.'",
-    "prepare": "npm run fix-permissions && echo 'Project prepared for execution.'",
-    "postinstall": "npm run fix-permissions && echo 'Permissions fixed for AppRun after installation.'"
+    "build": "chmod +x squashfs-root/AppRun"
   },
   "dependencies": {
     "archiver": "^7.0.1",
@@ -17,4 +14,5 @@
     "xmldom": "^0.6.0"
   }
 }
+
 

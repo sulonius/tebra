@@ -1,22 +1,22 @@
-# Koristi zvanični Ubuntu kao osnovnu sliku
-FROM ubuntu:20.04
+# Koristi Node.js sliku
+FROM node:18
 
-# Postavljanje ne-interaktivnog moda za apt-get (da bi instalacija prošla bez interakcije)
-ENV DEBIAN_FRONTEND=noninteractive
+# Instaliraj LibreOffice
+RUN apt-get update && apt-get install -y libreoffice && apt-get clean
 
-# Instalacija LibreOffice i drugih zavisnosti
-RUN apt-get update && apt-get install -y \
-    libreoffice \
-    curl \
-    unzip \
-    && rm -rf /var/lib/apt/lists/*
-
-# Postavljanje radnog direktorijuma
+# Kreiraj radni direktorijum
 WORKDIR /app
 
-# Kopiraj lokalne fajlove u kontejner
+# Kopiraj package.json i instaliraj zavisnosti
+COPY package.json ./
+RUN npm install
+
+# Kopiraj ostatak aplikacije
 COPY . .
 
-# Postavljanje komande za pokretanje aplikacije
-CMD ["node", "app.js"]
+# Expose porta za aplikaciju
+EXPOSE 3000
+
+# Pokreni aplikaciju
+CMD ["node", "server.js"]
 

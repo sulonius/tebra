@@ -1,22 +1,24 @@
-# Koristi Node.js sliku
-FROM node:18
+# Base image
+FROM node:16
 
-# Instaliraj LibreOffice
-RUN apt-get update && apt-get install -y libreoffice && apt-get clean
+# Install LibreOffice
+RUN apt-get update && apt-get install -y libreoffice
 
-# Kreiraj radni direktorijum
-WORKDIR /app
+# Set working directory
+WORKDIR /usr/src/app
 
-# Kopiraj package.json i instaliraj zavisnosti
-COPY package.json ./
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
 RUN npm install
 
-# Kopiraj ostatak aplikacije
+# Copy application code
 COPY . .
 
-# Expose porta za aplikaciju
+# Expose port
 EXPOSE 3000
 
-# Pokreni aplikaciju
-CMD ["node", "server.js"]
+# Start the application
+CMD ["node", "index.js"]
 

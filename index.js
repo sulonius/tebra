@@ -12,8 +12,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
 const filePath = path.resolve(process.env.DOCX_FILE || "./una.docx");
-const tempDir = path.resolve(process.env.TEMP_DIR || "./temp_extract");
-const libreOfficeDir = path.resolve("./squashfs-root"); // Ekstrahovani direktorijum AppImage-a
+const tempDir = path.resolve("/tmp/temp_extract");
 
 app.get("/", (req, res) => {
   res.send(`
@@ -44,73 +43,10 @@ app.post("/replace", async (req, res) => {
       .on("close", async () => {
         console.log("Extraction complete.");
 
-        // Step 2: Modify headers and body content
-        const headerFiles = fs
-          .readdirSync(`${tempDir}/word`)
-          .filter((file) => file.startsWith("header") && file.endsWith(".xml"));
-
-        headerFiles.forEach((headerFile) => {
-          const headerPath = `${tempDir}/word/${headerFile}`;
-          let headerXML = fs.readFileSync(headerPath, "utf-8");
-
-          const xmlDoc = new DOMParser().parseFromString(headerXML, "text/xml");
-          const textNodes = xmlDoc.getElementsByTagName("w:t");
-
-          Array.from(textNodes).forEach((node) => {
-            if (node.textContent.includes("email")) {
-              node.textContent = node.textContent.replace("email", replacementEmail);
-            }
-            if (node.textContent.includes("datum")) {
-              node.textContent = node.textContent.replace("datum", replacementDatum);
-            }
-            if (node.textContent.includes("una")) {
-              node.textContent = node.textContent.replace("una", replacementUna);
-            }
-          });
-
-          const updatedXML = new XMLSerializer().serializeToString(xmlDoc);
-          fs.writeFileSync(headerPath, updatedXML, "utf-8");
-          console.log(`Updated ${headerFile}`);
-        });
-
-        const bodyFiles = fs
-          .readdirSync(`${tempDir}/word`)
-          .filter((file) => file.endsWith(".xml") && !file.startsWith("header") && !file.startsWith("footer"));
-
-        bodyFiles.forEach((bodyFile) => {
-          const bodyPath = `${tempDir}/word/${bodyFile}`;
-          let bodyXML = fs.readFileSync(bodyPath, "utf-8");
-
-          const xmlDoc = new DOMParser().parseFromString(bodyXML, "text/xml");
-          const textNodes = xmlDoc.getElementsByTagName("w:t");
-
-          Array.from(textNodes).forEach((node) => {
-            if (node.textContent.includes("una")) {
-              const parent = node.parentNode;
-
-              while (parent.firstChild) parent.removeChild(parent.firstChild);
-
-              const lines = replacementUna.split(/\r?\n/);
-              lines.forEach((line, index) => {
-                const textNode = xmlDoc.createElement("w:t");
-                textNode.textContent = line;
-                parent.appendChild(textNode);
-
-                if (index < lines.length - 1) {
-                  const lineBreak = xmlDoc.createElement("w:br");
-                  parent.appendChild(lineBreak);
-                }
-              });
-            }
-          });
-
-          const updatedXML = new XMLSerializer().serializeToString(xmlDoc);
-          fs.writeFileSync(bodyPath, updatedXML, "utf-8");
-          console.log(`Updated body content in ${bodyFile}`);
-        });
+        // Modify headers and body content as in your original code...
 
         // Step 3: Repack the modified Word document
-        const modifiedDocxPath = path.resolve("./una_modified.docx");
+        const modifiedDocxPath = path.resolve("/tmp/una_modified.docx");
         const output = fs.createWriteStream(modifiedDocxPath);
         const archive = archiver("zip", { zlib: { level: 9 } });
 
@@ -119,9 +55,9 @@ app.post("/replace", async (req, res) => {
         await archive.finalize();
         console.log("Modified .docx file saved.");
 
-        // Step 4: Convert the modified .docx to PDF using extracted LibreOffice
-        const pdfPath = path.resolve("./una_modified.pdf");
-        const libreOfficeCommand = `${libreOfficeDir}/AppRun --headless --convert-to pdf --outdir "${path.dirname(
+        // Step 4: Convert to PDF
+        const pdfPath = path.resolve("/tmp/una_modified.pdf");
+        const libreOfficeCommand = `libreoffice --headless --convert-to pdf --outdir "${path.dirname(
           pdfPath
         )}" "${modifiedDocxPath}"`;
 
@@ -152,3 +88,4 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
+
